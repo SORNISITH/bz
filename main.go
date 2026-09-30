@@ -1,17 +1,31 @@
 package main
+
 import (
 	"cmp"
+	"encoding/json"
 	"fmt"
+	"log"
+	"io"
 	"math"
+	"os"
 	"slices"
 	"strings"
+	"time"
 )
 
+const DefaultFile = "data.json"
 const InitBet float64 = 1.0 // $
+
 type Player struct {
-	Name string
-	Odd  float64 // 1.1, 2.3, 4.5
-	Fair float64 // the bookmaker margin removed
+	Name string  `json:"name"`
+	Odd  float64 `json:"odd"`
+	Fair float64 `json:"-"`
+}
+
+type Input struct {
+	BetName string    `json:"bet_name"`
+	Bet    float64    `json:"bet"`
+	Groups [][]Player `json:"groups"`
 }
 
 func (p Player) Implied() float64 {
@@ -50,11 +64,11 @@ const (
 type Versus struct {
 	Opponents []Player
 	Type      Vtype
-	Bet       float64 
-	TotalOdd  float64 
-	WinProb   float64 
-	Price     float64 
-	Profit    float64 
+	Bet       float64
+	TotalOdd  float64
+	WinProb   float64
+	Price     float64
+	Profit    float64
 }
 
 type MatchList []Versus
@@ -174,20 +188,19 @@ func (h MatchList) Filter(t Vtype) MatchList {
 	return out
 }
 
-func (h MatchList) PrintAll() {
-	for _, v := range h {
-
-
-		parts := make([]string, len(v.Opponents))
-		for i, p := range v.Opponents {
-			parts[i] = fmt.Sprintf("%s [ %.2f ]", p.Name, p.Odd)
-		}
-		fmt.Printf("%-4s %-28s [%-5s] odd=%-8.2f win=%6.2f%%  bet=$%.2f -> price=$%.2f  profit=$%.2f\n",
-			v.Name(), strings.Join(parts, " x "), v.Type,
-			v.TotalOdd, v.WinPercent(), v.Bet, v.Price, v.Profit)
-	}
-}
-
+// func (h MatchList) PrintAll() {
+// 	for _, v := range h {
+// 
+// 		parts := make([]string, len(v.Opponents))
+// 		for i, p := range v.Opponents {
+// 			parts[i] = fmt.Sprintf("%s [ %.2f ]", p.Name, p.Odd)
+// 		}
+// 
+// 		fmt.Printf("%-4s %-28s [%-5s] odd=%-8.2f win=%6.2f%%  bet=$%.2f -> price=$%.2f  profit=$%.2f\n",
+// 			v.Name(), strings.Join(parts, " x "), v.Type,
+// 			v.TotalOdd, v.WinPercent(), v.Bet, v.Price, v.Profit)
+// 	}
+// }
 
 func PrintFair(groups ...[]Player) {
 	for i, g := range groups {
@@ -205,23 +218,83 @@ func PrintFair(groups ...[]Player) {
 	}
 }
 
+func LoadInput(path string) (Input, error) {
+	var in Input
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return in, fmt.Errorf("cannot read %q: %w", path, err)
+	}
+	if err := json.Unmarshal(data, &in); err != nil {
+		return in, fmt.Errorf("bad JSON in %q: %w", path, err)
+	}
+
+	if in.Bet <= 0 {
+		in.Bet = InitBet
+	}
+	if len(in.Groups) == 0 {
+		return in, fmt.Errorf("no groups in %q", path)
+	}
+	return in, nil
+}
+
 func main() {
-	A := Player{Name: "A", Odd: 5.6}
-	B := Player{Name: "B", Odd: 1.142}
-	C := Player{Name: "C", Odd: 1.47}
-	D := Player{Name: "D", Odd: 2.725}
-	// E := Player{Name: "E", Odd: 2.0}
-	// F := Player{Name: "F", Odd: 3.0}
+	file := DefaultFile
+	if len(os.Args) > 1 {
+		file = os.Args[1]
+	}
 
-	group1 := []Player{A, B}
-	group2 := []Player{C, D}
-//	group3 := []Player{E, F}
-	PrintFair(group1,group2)
-	stacks := Stacks(InitBet, group1, group2)
-
+	in, err := LoadInput(file)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
+	}
+	PrintFair(in.Groups...)
+	stacks := Stacks(InitBet, in.Groups...)
 	stacks.SortByPrice()
-	stacks.PrintAll()
+	err = stacks.PrintAndSave(in.BetName)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 }
 
 
+func (h MatchList) PrintAndSave(prefix string) error {
+	filename := fmt.Sprintf("%s : _%s.txt",
+		prefix,
+		time.Now().Format("20060102_150405"),
+	)
+
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	w := io.MultiWriter(os.Stdout, f)
+
+	h.Print(w)
+
+	return nil
+}
+func (h MatchList) Print(w io.Writer) {
+	for _, v := range h {
+		parts := make([]string, len(v.Opponents))
+
+		for i, p := range v.Opponents {
+			parts[i] = fmt.Sprintf("%s [ %.2f ]", p.Name, p.Odd)
+		}
+
+		fmt.Fprintf(w,
+			"%-4s %-28s [%-5s] odd=%-8.2f win=%6.2f%% bet=$%.2f -> price=$%.2f profit=$%.2f\n",
+			v.Name(),
+			strings.Join(parts, " x "),
+			v.Type,
+			v.TotalOdd,
+			v.WinPercent(),
+			v.Bet,
+			v.Price,
+			v.Profit,
+		)
+	}
+}
