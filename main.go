@@ -10,8 +10,8 @@ import (
 const InitBet float64 = 1.0 // $
 type Player struct {
 	Name string
-	Odd  float64 // example: 1.1, 2.3, 4.5
-	Fair float64 // win probability with the bookmaker margin removed
+	Odd  float64 // 1.1, 2.3, 4.5
+	Fair float64 // the bookmaker margin removed
 }
 
 func (p Player) Implied() float64 {
@@ -26,7 +26,6 @@ func round2(x float64) float64 {
 	return math.Round(x*100) / 100
 }
 
-// Normalize one group (= one event, like A vs B):
 // the fair probabilities of the group add up to 100%.
 func Normalize(group []Player) []Player {
 	sum := 0.0
@@ -51,11 +50,11 @@ const (
 type Versus struct {
 	Opponents []Player
 	Type      Vtype
-	Bet       float64 // money put in
-	TotalOdd  float64 // all odds multiplied (rounded to 2 decimals)
-	WinProb   float64 // fair chance that ALL legs win
-	Price     float64 // total return, stake included (1xBet "Possible win")
-	Profit    float64 // Price - Bet
+	Bet       float64 
+	TotalOdd  float64 
+	WinProb   float64 
+	Price     float64 
+	Profit    float64 
 }
 
 type MatchList []Versus
@@ -113,13 +112,12 @@ func (v Versus) Max() float64 {
 	return m
 }
 
-// One player from EACH group: 2 groups -> AC, 3 groups -> ACE ...
+// 2 groups -> AC, 3 groups -> ACE ...
 func Stacks(bet float64, groups ...[]Player) MatchList {
 	if len(groups) == 0 {
 		return nil
 	}
 
-	// remove the margin inside each group first
 	norm := make([][]Player, len(groups))
 	for i, g := range groups {
 		norm[i] = Normalize(g)
@@ -190,6 +188,23 @@ func (h MatchList) PrintAll() {
 	}
 }
 
+
+func PrintFair(groups ...[]Player) {
+	for i, g := range groups {
+		sum := 0.0
+		for _, p := range g {
+			sum += p.Implied()
+		}
+		fmt.Printf("\t Group %d | margin %.1f%%\n", i+1, (sum-1)*100)
+
+		for _, p := range Normalize(g) {
+			fmt.Printf("\t   %s [ %.2f ] -> $%.2f | implied %.1f%% | fair %.1f%%\n",
+				p.Name, p.Odd, p.Price(InitBet), p.Implied()*100, p.Fair*100)
+		}
+		fmt.Println()
+	}
+}
+
 func main() {
 	A := Player{Name: "A", Odd: 5.6}
 	B := Player{Name: "B", Odd: 1.142}
@@ -210,18 +225,3 @@ func main() {
 }
 
 
-func PrintFair(groups ...[]Player) {
-	for i, g := range groups {
-		sum := 0.0
-		for _, p := range g {
-			sum += p.Implied()
-		}
-		fmt.Printf("\t Group %d | margin %.1f%%\n", i+1, (sum-1)*100)
-
-		for _, p := range Normalize(g) {
-			fmt.Printf("\t   %s [ %.2f ] -> $%.2f | implied %.1f%% | fair %.1f%%\n",
-				p.Name, p.Odd, p.Price(InitBet), p.Implied()*100, p.Fair*100)
-		}
-		fmt.Println()
-	}
-}
