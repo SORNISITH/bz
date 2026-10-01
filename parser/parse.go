@@ -202,3 +202,8 @@ func main() {
 	json.Unmarshal(data, &res)
 	fmt.Printf("saved %s | event: %s | %d fights\n", out, res.BetName, len(res.Groups))
 }
+
+
+
+
+

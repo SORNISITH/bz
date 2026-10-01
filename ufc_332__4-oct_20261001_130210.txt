@@ -1,0 +1,19 @@
+	 Group 1 | margin 6.0%
+	   Court McGee [ 3.030 ] -> $3.03 | implied 33.0% | fair 31.1%
+	   Eric Nolan [ 1.370 ] -> $1.37 | implied 73.0% | fair 68.9%
+	 Group 2 | margin 6.0%
+	   Marvin Vettori [ 2.104 ] -> $2.10 | implied 47.5% | fair 44.8%
+	   Ismail Naurdiev [ 1.710 ] -> $1.71 | implied 58.5% | fair 55.2%
+
+Court McGee : Marvin Vettori 
+ ->  odd=6.38     -> W= 13.96% -> bet=$1.00 -> price=$6.38
+
+Court McGee : Ismail Naurdiev 
+ ->  odd=5.18     -> W= 17.18% -> bet=$1.00 -> price=$5.18
+
+Eric Nolan : Marvin Vettori 
+ ->  odd=2.88     -> W= 30.87% -> bet=$1.00 -> price=$2.88
+
+Eric Nolan : Ismail Naurdiev 
+ ->  odd=2.34     -> W= 37.99% -> bet=$1.00 -> price=$2.34
+
