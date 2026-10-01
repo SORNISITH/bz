@@ -19,6 +19,7 @@ const InitBet float64 = 1.0 // $
 type Player struct {
 	Name string  `json:"name"`
 	Odd  float64 `json:"odd"`
+	SportOdd  float64 `json:"sport_odd"`
 	Fair float64 `json:"-"`
 }
 
@@ -66,6 +67,7 @@ type Versus struct {
 	Type      Vtype
 	Bet       float64
 	TotalOdd  float64
+	TotalSportOdd  float64
 	WinProb   float64
 	Price     float64
 	Profit    float64
@@ -76,6 +78,7 @@ type MatchList []Versus
 func NewVersus(players []Player, bet float64) Versus {
 	t := Equal
 	totalOdd := 1.0
+	totalSportOdd := 1.0
 	prob := 1.0
 
 	for _, p := range players {
@@ -83,17 +86,20 @@ func NewVersus(players []Player, bet float64) Versus {
 			t = Diff
 		}
 		totalOdd *= p.Odd
+		totalSportOdd *= p.SportOdd
 		prob *= p.Fair
 	}
 
 	totalOdd = round2(totalOdd)
 	price := round2(bet * totalOdd)
-
+	
+	
 	return Versus{
 		Opponents: players,
 		Type:      t,
 		Bet:       bet,
 		TotalOdd:  totalOdd,
+		TotalSportOdd:  totalSportOdd,
 		WinProb:   prob,
 		Price:     price,
 		Profit:    round2(price - bet),
@@ -202,20 +208,20 @@ func (h MatchList) Filter(t Vtype) MatchList {
 // 	}
 // }
 
-func PrintFair(groups ...[]Player) {
+func PrintFair(  w io.Writer ,groups ...[]Player) {
 	for i, g := range groups {
 		sum := 0.0
 		for _, p := range g {
 			sum += p.Implied()
 		}
-		fmt.Printf("\t Group %d | margin %.1f%%\n", i+1, (sum-1)*100)
+		fmt.Fprintf(w ,"\t Group %d | margin %.1f%%\n", i+1, (sum-1)*100)
 
 		for _, p := range Normalize(g) {
-			fmt.Printf("\t   %s [ %.2f ] -> $%.2f | implied %.1f%% | fair %.1f%%\n",
+			fmt.Fprintf( w ,"\t   %s [ %.2f ] -> $%.2f | implied %.1f%% | fair %.1f%%\n",
 				p.Name, p.Odd, p.Price(InitBet), p.Implied()*100, p.Fair*100)
 		}
-		fmt.Println()
 	}
+	fmt.Fprintf(w, "\n")
 }
 
 func LoadInput(path string) (Input, error) {
@@ -248,10 +254,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
-	PrintFair(in.Groups...)
+
 	stacks := Stacks(InitBet, in.Groups...)
 	stacks.SortByPrice()
-	err = stacks.PrintAndSave(in.BetName)
+	err = stacks.PrintAndSave(in)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -259,9 +265,9 @@ func main() {
 }
 
 
-func (h MatchList) PrintAndSave(prefix string) error {
+func (h MatchList) PrintAndSave(in Input) error {
 	filename := fmt.Sprintf("%s : _%s.txt",
-		prefix,
+		in.BetName,
 		time.Now().Format("20060102_150405"),
 	)
 
@@ -271,8 +277,9 @@ func (h MatchList) PrintAndSave(prefix string) error {
 	}
 	defer f.Close()
 
-	w := io.MultiWriter(os.Stdout, f)
+	w := io.MultiWriter(os.Stdout)
 
+	PrintFair(w ,in.Groups...)
 	h.Print(w)
 
 	return nil
@@ -282,19 +289,17 @@ func (h MatchList) Print(w io.Writer) {
 		parts := make([]string, len(v.Opponents))
 
 		for i, p := range v.Opponents {
-			parts[i] = fmt.Sprintf("%s [ %.2f ]", p.Name, p.Odd)
+			parts[i] = fmt.Sprintf("%s[ %.2f ]", p.Name, p.Odd)
 		}
 
 		fmt.Fprintf(w,
-			"%-4s %-28s [%-5s] odd=%-8.2f win=%6.2f%% bet=$%.2f -> price=$%.2f profit=$%.2f\n",
+			"%-4s %-28s ood=%-8.2f W=%3.2f%%  bet=$%.2f -> price=$%.2f \n",
 			v.Name(),
-			strings.Join(parts, " x "),
-			v.Type,
+			strings.Join(parts, " + "),
 			v.TotalOdd,
 			v.WinPercent(),
 			v.Bet,
 			v.Price,
-			v.Profit,
 		)
 	}
 }
